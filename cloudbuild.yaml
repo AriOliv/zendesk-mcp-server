@@ -1,0 +1,11 @@
+# Build the HTTP (supergateway) deployment image.
+#   gcloud builds submit --config cloudbuild.yaml --substitutions _TAG=v1 .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "Dockerfile.gateway", "-t", "gcr.io/$PROJECT_ID/zendesk-mcp:$_TAG", "."]
+images:
+  - "gcr.io/$PROJECT_ID/zendesk-mcp:$_TAG"
+substitutions:
+  _TAG: v1
+options:
+  logging: CLOUD_LOGGING_ONLY

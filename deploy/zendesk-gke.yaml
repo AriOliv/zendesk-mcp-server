@@ -1,0 +1,52 @@
+# Zendesk MCP on GKE (namespace: studio), behind supergateway (streamable HTTP).
+# Uses deprecated API-token auth (works headless). Zendesk stops accepting API
+# tokens on 2027-04-30 — migrate to OAuth (persisted token file on a PVC) before then.
+#
+# 1) Create the credential secret WITHOUT committing values (run in your shell):
+#      kubectl -n studio create secret generic zendesk-mcp-env \
+#        --from-literal=ZENDESK_SUBDOMAIN=<subdomain> \
+#        --from-literal=ZENDESK_EMAIL=<agent-email> \
+#        --from-literal=ZENDESK_API_KEY=<api-token>
+# 2) Build + push the image (see cloudbuild.yaml), then: kubectl apply -f deploy/zendesk-gke.yaml
+# 3) Point the Studio connection at: http://zendesk-mcp.studio.svc.cluster.local:8000/mcp
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zendesk-mcp
+  namespace: studio
+  labels: { app: zendesk-mcp }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: zendesk-mcp } }
+  template:
+    metadata: { labels: { app: zendesk-mcp } }
+    spec:
+      containers:
+        - name: mcp
+          image: gcr.io/ari-teste-492120/zendesk-mcp:v1
+          envFrom:
+            - secretRef: { name: zendesk-mcp-env }
+          ports: [{ containerPort: 8000 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: zendesk-mcp, namespace: studio }
+spec:
+  selector: { app: zendesk-mcp }
+  ports: [{ port: 8000, targetPort: 8000 }]
