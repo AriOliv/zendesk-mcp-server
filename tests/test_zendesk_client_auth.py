@@ -114,3 +114,39 @@ def test_get_ticket_attachment_rejects_spoofed_magic_bytes(client):
 
     with pytest.raises(ValueError, match="does not match declared content type"):
         client.get_ticket_attachment(ATTACHMENT_URL)
+
+
+@responses.activate
+def test_get_ticket_attachment_rejects_non_zendesk_host(client):
+    # A caller-supplied URL to an arbitrary host must be refused BEFORE any
+    # request is made, so the Zendesk auth header can never leak off-tenant.
+    with pytest.raises(ValueError, match="Refusing to fetch attachment"):
+        client.get_ticket_attachment("https://attacker.example.net/x.png")
+    with pytest.raises(ValueError, match="Refusing to fetch attachment"):
+        client.get_ticket_attachment("https://169.254.169.254/latest/meta-data/")
+    assert len(responses.calls) == 0
+
+
+@responses.activate
+def test_get_ticket_attachment_rejects_non_https(client):
+    with pytest.raises(ValueError, match="https"):
+        client.get_ticket_attachment("http://example.zendesk.com/attachments/x.png")
+    assert len(responses.calls) == 0
+
+
+@responses.activate
+def test_get_ticket_attachment_allows_cdn_host(client):
+    cdn_url = "https://foo.zdusercontent.com/x.png"
+    body = PNG_MAGIC + b"payload"
+    responses.add(
+        responses.GET,
+        cdn_url,
+        body=body,
+        content_type="image/png",
+        status=200,
+    )
+
+    result = client.get_ticket_attachment(cdn_url)
+
+    assert result["content_type"] == "image/png"
+    assert base64.b64decode(result["data"]) == body

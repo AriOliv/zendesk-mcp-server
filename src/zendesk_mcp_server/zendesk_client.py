@@ -165,6 +165,29 @@ class ZendeskClient:
     # 10 MB hard cap to guard against image bombs and token budget blowout.
     _MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
+    def _validate_attachment_url(self, content_url: str) -> None:
+        """
+        Refuse attachment URLs not on the tenant's Zendesk domain or the Zendesk
+        attachment CDN.
+
+        ``content_url`` is tool input, so without this check an attacker who can
+        shape it (e.g. a prompt-injected agent acting on a malicious ticket)
+        could point it at an internal address (SSRF) or their own host. The
+        shared session attaches the Zendesk ``Authorization`` header to *every*
+        request, so the very first request to an off-tenant host would leak that
+        credential — the cross-origin redirect stripping only protects redirects,
+        not the initial request. Validate before any request is made.
+        """
+        parsed = urllib.parse.urlparse(content_url)
+        if parsed.scheme != "https":
+            raise ValueError("Attachment URL must use https.")
+        host = (parsed.hostname or "").lower()
+        if host != f"{self.subdomain}.zendesk.com" and not host.endswith(".zdusercontent.com"):
+            raise ValueError(
+                f"Refusing to fetch attachment from host '{host}'. Only "
+                f"{self.subdomain}.zendesk.com and *.zdusercontent.com are allowed."
+            )
+
     def get_ticket_attachment(self, content_url: str) -> Dict[str, Any]:
         """
         Fetch an image attachment and return base64-encoded data.
@@ -180,6 +203,7 @@ class ZendeskClient:
         The session's auth callable is applied when the request is prepared and
         is not reapplied by requests on redirect, so this still holds.
         """
+        self._validate_attachment_url(content_url)
         try:
             response = self.session.get(
                 content_url,
