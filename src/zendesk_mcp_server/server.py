@@ -215,7 +215,11 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="create_ticket_comment",
-            description="Create a new comment on an existing Zendesk ticket",
+            description=(
+                "Create a new comment on an existing Zendesk ticket. Defaults to an "
+                "INTERNAL note visible only to agents. Pass public=true only when the "
+                "comment is meant to be sent to the requester/customer."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -229,8 +233,11 @@ async def handle_list_tools() -> list[types.Tool]:
                     },
                     "public": {
                         "type": "boolean",
-                        "description": "Whether the comment should be public",
-                        "default": True
+                        "description": (
+                            "true = public reply emailed/shown to the requester; "
+                            "false (default) = internal note visible only to agents"
+                        ),
+                        "default": False
                     }
                 },
                 "required": ["ticket_id", "comment"]
@@ -336,7 +343,7 @@ async def handle_call_tool(
         elif name == "create_ticket_comment":
             if not arguments:
                 raise ValueError("Missing arguments")
-            public = arguments.get("public", True)
+            public = arguments.get("public", False)
             result = get_zendesk_client().post_comment(
                 ticket_id=arguments["ticket_id"],
                 comment=arguments["comment"],
