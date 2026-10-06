@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: mcp
-          image: gcr.io/ari-teste-492120/zendesk-mcp:v1
+          image: gcr.io/ari-teste-492120/zendesk-mcp:cc9c936
           envFrom:
             - secretRef: { name: zendesk-mcp-env }
           ports: [{ containerPort: 8000 }]
@@ -37,8 +37,10 @@ spec:
             periodSeconds: 20
             failureThreshold: 3
           resources:
-            requests: { cpu: 50m, memory: 128Mi }
-            limits: { cpu: 500m, memory: 256Mi }
+            # supergateway (stateless) spawns one Python `zendesk` child per
+            # request; a burst of initialize/list/call overflows 256Mi (OOMKilled).
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 1Gi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
