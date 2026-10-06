@@ -211,6 +211,16 @@ You can containerize the server if you prefer an isolated runtime:
 
 The image installs dependencies from `requirements.lock` and drops privileges to a non-root user. With API token authentication no volume is needed, since configuration comes entirely from environment variables.
 
+### Streamable HTTP (remote / Kubernetes)
+
+Set `MCP_TRANSPORT=http` to serve the MCP streamable HTTP transport instead of stdio, from one long-lived process:
+
+```bash
+docker run --rm -p 8000:8000 --env-file /path/to/.env -e MCP_TRANSPORT=http zendesk-mcp-server
+```
+
+The endpoint is `POST /mcp` (stateless, JSON responses) and `GET /healthz` is a liveness probe. `MCP_HOST` and `MCP_PORT` default to `0.0.0.0` and `8000`. The server has no authentication of its own, so expose it only on a private network or behind a gateway. `deploy/zendesk-gke.yaml` and `cloudbuild.yaml` deploy it to GKE.
+
 ### Claude MCP Integration
 
 To use the Dockerized server from Claude Code/Desktop, add an entry to Claude Code's `settings.json` similar to:

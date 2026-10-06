@@ -1,4 +1,4 @@
-# Zendesk MCP on GKE (namespace: studio), behind supergateway (streamable HTTP).
+# Zendesk MCP on GKE (namespace: studio), native streamable HTTP (MCP_TRANSPORT=http).
 # Uses deprecated API-token auth (works headless). Zendesk stops accepting API
 # tokens on 2027-04-30 — migrate to OAuth (persisted token file on a PVC) before then.
 #
@@ -24,6 +24,8 @@ spec:
       containers:
         - name: mcp
           image: gcr.io/ari-teste-492120/zendesk-mcp:cc9c936
+          env:
+            - { name: MCP_TRANSPORT, value: http }
           envFrom:
             - secretRef: { name: zendesk-mcp-env }
           ports: [{ containerPort: 8000 }]
@@ -37,15 +39,13 @@ spec:
             periodSeconds: 20
             failureThreshold: 3
           resources:
-            # supergateway (stateless) spawns one Python `zendesk` child per
-            # request; a burst of initialize/list/call overflows 256Mi (OOMKilled).
-            requests: { cpu: 50m, memory: 256Mi }
-            limits: { cpu: 500m, memory: 1Gi }
+            # One long-lived Python process (~50Mi at rest) serves every request.
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
-            # Dockerfile.gateway sets USER appuser by name; the kubelet can only
-            # verify runAsNonRoot against a numeric UID, so pin appuser's ids.
+            # Matches the image's USER 999:999 (appuser).
             runAsUser: 999
             runAsGroup: 999
             capabilities: { drop: ["ALL"] }
