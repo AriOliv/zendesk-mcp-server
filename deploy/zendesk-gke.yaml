@@ -42,6 +42,10 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
+            # Dockerfile.gateway sets USER appuser by name; the kubelet can only
+            # verify runAsNonRoot against a numeric UID, so pin appuser's ids.
+            runAsUser: 999
+            runAsGroup: 999
             capabilities: { drop: ["ALL"] }
 ---
 apiVersion: v1
