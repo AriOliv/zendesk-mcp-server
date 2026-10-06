@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: mcp
-          image: gcr.io/ari-teste-492120/zendesk-mcp:cc9c936
+          image: gcr.io/ari-teste-492120/zendesk-mcp:5d8a4ae
           env:
             - { name: MCP_TRANSPORT, value: http }
           envFrom:
