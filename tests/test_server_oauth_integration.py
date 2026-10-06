@@ -301,3 +301,38 @@ def test_missing_tokens_tell_the_operator_to_bootstrap(oauth_server, tmp_path, m
     result = call_tool(oauth_server, "get_ticket", {"ticket_id": 42})
 
     assert "zendesk-auth" in result[0].text
+
+
+@responses.activate
+def test_create_ticket_comment_defaults_to_internal(oauth_server):
+    """Omitting `public` must post an internal note, never a public reply."""
+    responses.add(responses.GET, f"{API}/tickets/42.json", json={"ticket": TICKET_JSON})
+    responses.add(
+        responses.PUT,
+        f"{API}/tickets/42.json",
+        json={"ticket": TICKET_JSON, "audit": {"id": 1, "ticket_id": 42, "events": []}},
+    )
+
+    call_tool(oauth_server, "create_ticket_comment", {"ticket_id": 42, "comment": "note"})
+
+    put = [c.request for c in responses.calls if c.request.method == "PUT"][0]
+    assert json.loads(put.body)["ticket"]["comment"]["public"] is False
+
+
+@responses.activate
+def test_create_ticket_comment_public_when_requested(oauth_server):
+    responses.add(responses.GET, f"{API}/tickets/42.json", json={"ticket": TICKET_JSON})
+    responses.add(
+        responses.PUT,
+        f"{API}/tickets/42.json",
+        json={"ticket": TICKET_JSON, "audit": {"id": 1, "ticket_id": 42, "events": []}},
+    )
+
+    call_tool(
+        oauth_server,
+        "create_ticket_comment",
+        {"ticket_id": 42, "comment": "reply", "public": True},
+    )
+
+    put = [c.request for c in responses.calls if c.request.method == "PUT"][0]
+    assert json.loads(put.body)["ticket"]["comment"]["public"] is True
